@@ -1,0 +1,92 @@
+id: pcb_defect_triage_v1
+version: 0.1.0
+description: OpenEnv for PCB defect triage (easy → medium → hard)
+author: Venkateswaran K
+license: MIT
+type: reinforcement
+
+environment:
+  name: PCBEnv
+  batch_size: 50
+  max_slots: 5
+
+observation:
+  type: object
+  properties:
+    defect_type:
+      type: string
+      description: "Category of detected defect (none, missing_component, solder_bridge, misalignment, short_circuit)"
+    criticality_score:
+      type: float
+      description: "Severity of defect (0-1)"
+    component_cost:
+      type: float
+      description: "Cost of affected component in USD"
+    inspection_confidence:
+      type: float
+      description: "Confidence of inspection result (0-1)"
+    queue_length:
+      type: integer
+      description: "Current queue size"
+    available_slots:
+      type: integer
+      description: "Free repair slots"
+
+action:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+        - PASS
+        - SCRAP
+        - ROUTE_COMPONENT_REPLACEMENT
+        - ROUTE_SOLDERING
+        - ROUTE_DIAGNOSTICS
+        - WAIT
+      description: "Triage decision for the PCB"
+
+reward:
+  type: object
+  properties:
+    reward:
+      type: float
+      description: "Scalar reward value (-1.0 to 1.0)"
+
+tasks:
+  - name: easy
+    description: "Single-step perfect decision (PASS vs SCRAP)"
+    baseline_score: 1.0
+  
+  - name: medium
+    description: "Routing decision based on defect type (5 boards)"
+    baseline_score: 0.8
+  
+  - name: hard
+    description: "Full batch processing with optimal routing (50 boards)"
+    baseline_score: 0.75
+
+metrics:
+  - name: average_reward
+    description: "Average reward per step"
+  
+  - name: success_rate
+    description: "Percentage of correct routing decisions"
+  
+  - name: slot_utilization
+    description: "Percentage of repair slots utilized"
+  
+  - name: queue_efficiency
+    description: "Average queue length during episode"
+
+constraints:
+  - max_episode_steps: 50
+  - max_parallel_repairs: 5
+  - action_space_size: 6
+  - observation_space_size: 6
+
+contest:
+  deployment_target: docker
+  performance_target_score: 0.85
+  time_limit_per_step_ms: 100
+  memory_limit_mb: 512
