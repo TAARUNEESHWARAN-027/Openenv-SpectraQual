@@ -26,12 +26,12 @@ ENV API_BASE_URL="https://openrouter.ai/api/v1"
 ENV MODEL_NAME="meta-llama/llama-3.3-70b-instruct"
 ENV HF_TOKEN=""
 
-# ── Expose Streamlit port (HF Spaces default) ─────────────────────────────────
+# ── Expose API port (HF Spaces default) ───────────────────────────────────────
 EXPOSE 7860
 
 # ── Health check ──────────────────────────────────────────────────────────────
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:7860/_stcore/health || exit 1
+    CMD curl -f http://localhost:7860/ || exit 1
 
 # ── Default command: launch FastAPI server ───────────────────────────────
 CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "7860"]

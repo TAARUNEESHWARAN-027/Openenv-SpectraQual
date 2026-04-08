@@ -1,4 +1,4 @@
-# ⚔️ SpectraQual — PCB Smart Quality-Control OpenEnv Environment
+# SpectraQual — PCB Smart Quality-Control OpenEnv Environment
 
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compliant-00e5ff?style=flat-square)](https://github.com/openenv)
 [![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square)](https://python.org)
@@ -22,9 +22,9 @@ An AI agent receives a stream of PCBs, each with a different defect type, compon
 | **Observation Space** | 13 fields (typed Pydantic model) |
 | **Reward Range** | `[0.0, 1.0]` normalized |
 | **Reward Signal** | Dense (per-step), 5 components |
-| **Seeded / Reproducible** | ✅ Yes |
-| **Anomaly Detection** | ✅ Yes |
-| **OpenEnv Spec** | ✅ Compliant |
+| **Seeded / Reproducible** | Yes |
+| **Anomaly Detection** | Yes |
+| **OpenEnv Spec** | Compliant |
 
 ---
 
@@ -150,7 +150,7 @@ python src/main.py
 
 ---
 
-## 🐳 Docker
+## Docker
 
 ```bash
 # Build
@@ -174,7 +174,7 @@ streamlit run src/app.py --server.port 8501
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 spectraqual/
@@ -197,7 +197,7 @@ spectraqual/
 
 ---
 
-## 📊 Baseline Scores
+## Baseline Scores
 
 | Agent | task_easy | task_medium | task_hard |
 |---|---|---|---|
@@ -207,7 +207,7 @@ spectraqual/
 
 ---
 
-## 🔬 Research Extensions
+## Research Extensions
 
 The environment supports:
 - **Anomaly detection mode**: boards with extreme cost+criticality are flagged
@@ -219,7 +219,7 @@ The environment supports:
 
 ---
 
-## ⚙️ Environment Variables for Inference
+## Environment Variables for Inference
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
@@ -230,6 +230,6 @@ The environment supports:
 
 ---
 
-## 📄 License
+## License
 
 MIT License — see [LICENSE](LICENSE).

@@ -2,7 +2,7 @@ from env import generate_pcb, calculate_reward, update_factory, factory
 from agent import get_state, choose_action, update_q
 
 EPISODES = 500
-STEPS_PER_EPISODE = 20   # 🔥 NEW
+STEPS_PER_EPISODE = 20   # multi-step episodes
 
 for ep in range(EPISODES):
 
@@ -28,4 +28,4 @@ for ep in range(EPISODES):
         pcb = next_pcb
         state = next_state
 
-print("Training Complete ⚔️")
+print("Training Complete")

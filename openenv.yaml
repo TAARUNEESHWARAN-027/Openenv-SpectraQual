@@ -87,7 +87,7 @@ interface:
 
 # Deployment
 deployment:
-  hf_space: "your-username/spectraqual"
+  hf_space: "TAARUNEESHWARAN-027/spectraqual"
   port: 7860
   runtime: fastapi
   api_docs: "/docs"
