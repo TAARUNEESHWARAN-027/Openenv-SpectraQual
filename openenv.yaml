@@ -1,0 +1,92 @@
+name: spectraqual
+version: "1.0.0"
+description: >
+  SpectraQual is a smart PCB (Printed Circuit Board) quality-control triage
+  environment. An AI agent processes a stream of boards with randomized defects,
+  choosing the optimal economic and operational action under factory slot
+  constraints. Rewards are decomposed into 5 interpretable components and
+  normalized to [0.0, 1.0] for clean agent training.
+author: "SpectraQual Team"
+tags:
+  - pcb
+  - manufacturing
+  - quality-control
+  - industrial-ai
+  - real-world
+  - openenv
+
+# Action space
+actions:
+  - PASS
+  - SCRAP
+  - ROUTE_COMPONENT_REPLACEMENT
+  - ROUTE_SOLDERING
+  - ROUTE_DIAGNOSTICS
+  - WAIT
+
+# Observation fields
+observations:
+  - board_id: "Unique PCB identifier (string)"
+  - defect_type: "none | missing_component | solder_bridge | short_circuit"
+  - component_cost: "Replacement cost in ₹ (10.0–200.0)"
+  - criticality: "Risk score (0.1–1.0)"
+  - slots_free: "Available soldering slots (0–3)"
+  - slots_state: "Time remaining per slot (list of ints)"
+  - is_anomaly: "True if board has extreme cost+criticality"
+  - anomaly_score: "Anomaly confidence (0.0–1.0)"
+  - valid_actions: "Actions permitted for this defect type"
+  - rolling_accuracy: "Fraction of correct decisions so far"
+  - throughput: "Boards processed per step"
+  - cumulative_reward: "Episode cumulative normalized reward"
+
+# Reward range
+reward:
+  min: 0.0
+  max: 1.0
+  components:
+    - defect_reward: "Correctness of decision for defect type (weight=0.35)"
+    - cost_efficiency: "Economic value retained vs lost (weight=0.25)"
+    - queue_penalty: "Factory bottleneck avoidance (weight=0.20)"
+    - criticality_factor: "Risk-adjusted modifier (weight=0.10)"
+    - anomaly_bonus: "Correct handling of anomalous boards (weight=0.10)"
+
+# Tasks
+tasks:
+  - id: task_easy
+    description: "Triage 10 boards with no slot pressure. Seed=42."
+    difficulty: easy
+    n_boards: 10
+    seed: 42
+    n_slots: 3
+    anomaly_rate: 0.0
+    expected_score: 0.85
+
+  - id: task_medium
+    description: "Triage 15 boards with 1 soldering slot (queue pressure). Seed=99."
+    difficulty: medium
+    n_boards: 15
+    seed: 99
+    n_slots: 1
+    anomaly_rate: 0.10
+    expected_score: 0.65
+
+  - id: task_hard
+    description: "Triage 20 boards with 25% anomaly rate and tight slot constraints. Seed=777."
+    difficulty: hard
+    n_boards: 20
+    seed: 777
+    n_slots: 1
+    anomaly_rate: 0.25
+    expected_score: 0.50
+
+# Interface compliance
+interface:
+  reset: "Returns initial PCBObservation without reward"
+  step: "Takes PCBAction, returns StepResult (observation, reward, done, info)"
+  state: "Returns full internal environment state as dict"
+
+# Deployment
+deployment:
+  hf_space: "your-username/spectraqual"
+  port: 7860
+  runtime: streamlit

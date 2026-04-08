@@ -1,131 +1,235 @@
-# SpectraQual
+# ⚔️ SpectraQual — PCB Smart Quality-Control OpenEnv Environment
 
-SpectraQual is a simulated smart quality-control decision system for PCB (Printed Circuit Board) triage. It models incoming boards with different defect types, chooses an action (pass, repair route, wait, or scrap), and scores each decision using an economic reward function.
+[![OpenEnv](https://img.shields.io/badge/OpenEnv-Compliant-00e5ff?style=flat-square)](https://github.com/openenv)
+[![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-The project combines:
-- A rule-informed environment model of defects, costs, criticality, and factory slot capacity.
-- A Q-learning agent that learns action values over abstracted state buckets.
-- A Streamlit dashboard for real-time simulation, visibility, and decision analytics.
+**SpectraQual** is a real-world AI environment that simulates smart quality-control triage for Printed Circuit Boards (PCBs) in a manufacturing factory.
 
-## Purpose
+An AI agent receives a stream of PCBs, each with a different defect type, component cost, and criticality score. The agent must choose the optimal economic action (Pass, Scrap, Route to Repair, Wait) while managing a shared factory soldering slot queue.
 
-The current implementation is designed to demonstrate how AI-assisted decisioning can optimize manufacturing outcomes under operational constraints.
+> **Why this problem matters:** PCB triage is a real, high-stakes manufacturing task. Wrong decisions mean wasted boards, bottlenecked production lines, and downstream electronics failures. SpectraQual models this as an RL environment where an agent must balance economic value, operational constraints, and risk — a setting where LLM agents can be meaningfully evaluated.
 
-Core goals:
-- Maximize economic score across a stream of boards.
-- Balance repair value against risk, delay, and resource bottlenecks.
-- Visualize decisions and factory capacity in real time.
+---
 
-## How The System Works
+##  Environment Overview
 
-Each simulation step:
-1. Factory time advances (occupied soldering slots count down).
-2. A random PCB is generated with:
-	 - defect type
-	 - component replacement cost
-	 - criticality score
-3. The current board + factory context are converted into an RL state.
-4. The agent chooses a valid action for that defect.
-5. Reward is computed from defect/action economics.
-6. Score and history are updated for trend analysis.
+| Property | Value |
+|---|---|
+| **Domain** | Smart Manufacturing / Industrial AI |
+| **Tasks** | 3 (Easy → Hard) |
+| **Action Space** | 6 discrete actions |
+| **Observation Space** | 13 fields (typed Pydantic model) |
+| **Reward Range** | `[0.0, 1.0]` normalized |
+| **Reward Signal** | Dense (per-step), 5 components |
+| **Seeded / Reproducible** | ✅ Yes |
+| **Anomaly Detection** | ✅ Yes |
+| **OpenEnv Spec** | ✅ Compliant |
 
-## Project Structure (Current Behavior)
+---
 
-- `src/app.py`
-	- Streamlit UI application.
-	- Runs one-step or auto-run simulation loops.
-	- Displays PCB details, chosen action, confidence indicator, reward, slot occupancy, cumulative score, trend plot, and decision distribution.
-	- Uses the RL agent for decision selection (`epsilon=0` in UI, i.e., greedy policy).
+##  Action Space
 
-- `src/env.py`
-	- Environment and business logic source of truth.
-	- Maintains global factory state (`soldering_slots`).
-	- Generates random PCBs.
-	- Updates slot timers.
-	- Assigns soldering jobs when capacity is available.
-	- Contains baseline rule policy (`decide_action`) and an environment reward function.
+| Action | Description | Valid When |
+|---|---|---|
+| `PASS` | Clear the board — no defect | `defect_type = none` |
+| `SCRAP` | Discard the board | Any defect |
+| `ROUTE_COMPONENT_REPLACEMENT` | Send to component repair | `missing_component` |
+| `ROUTE_SOLDERING` | Send to soldering station | `solder_bridge` |
+| `ROUTE_DIAGNOSTICS` | Send for investigation | `short_circuit` |
+| `WAIT` | Hold board until slot free | `solder_bridge` (no slot) |
 
-- `src/agent.py`
-	- Q-learning implementation.
-	- Defines action space and valid action constraints per defect type.
-	- Converts raw inputs into a compact state tuple.
-	- Implements epsilon-greedy action selection and Q-value updates.
+---
 
-- `src/reward.py`
-	- Separate reward function module used by the Streamlit app.
-	- Mirrors the same reward intent as `env.py` and references factory slot availability.
-	- Note: this duplication means reward logic exists in two places.
+##  Observation Space
 
-- `src/train.py`
-	- Offline trainer for Q-table learning.
-	- Runs multiple episodes and steps, updates Q-values via temporal-difference learning.
-
-- `src/main.py`
-	- Terminal simulation runner using rule-based decision logic from `env.py`.
-	- Useful for quick sanity checks without UI.
-
-- `src/config.py`
-	- Currently empty (placeholder for future centralized configuration).
-
-- `src/models.py`
-	- Currently empty (placeholder for typed data models/domain classes).
-
-- `requirements.txt`
-	- Currently empty.
-	- Based on imports, the project needs at least `streamlit` and `matplotlib`.
-
-## Running The Project
-
-From project root:
-
-```bash
-# Optional: create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install required packages (requirements.txt is currently empty)
-pip install streamlit matplotlib
+```python
+class PCBObservation(BaseModel):
+    board_id: str                   # Unique PCB ID (e.g. "SQ-4321")
+    defect_type: str                # "none" | "missing_component" | "solder_bridge" | "short_circuit"
+    component_cost: float           # Replacement cost ₹10–200
+    criticality: float              # Risk score 0.1–1.0
+    slots_free: int                 # Available soldering slots
+    slots_state: List[int]          # Remaining time per slot (0=free, -1=locked)
+    is_anomaly: bool                # True if board is rare/extreme
+    anomaly_score: float            # Anomaly confidence 0.0–1.0
+    valid_actions: List[str]        # Permitted actions for this defect
+    rolling_accuracy: float         # Fraction of correct decisions so far
+    throughput: float               # Boards/step so far
+    cumulative_reward: float        # Episode cumulative reward
+    step: int                       # Current step number
 ```
 
-### 1) Launch the Streamlit dashboard
+---
+
+##  Reward Function
+
+Reward is **dense** (given every step) and **decomposed into 5 interpretable components**, all normalized to `[0.0, 1.0]`:
+
+| Component | Weight | Description |
+|---|---|---|
+| `defect_reward` | 35% | Correctness of the action for the defect type |
+| `cost_efficiency` | 25% | Economic value retained vs. lost |
+| `queue_penalty` | 20% | Factory bottleneck avoidance |
+| `criticality_factor` | 10% | Risk-adjusted multiplier |
+| `anomaly_bonus` | 10% | Correct handling of anomalous boards |
+
+**Final reward** = weighted sum of all 5 components, clamped to `[0.0, 1.0]`.
+
+Every `StepResult` includes a full `RewardComponents` object with an `explanation` field explaining why the reward was given — enabling full explainability.
+
+---
+
+##  Tasks
+
+### Task Easy (`task_easy`)
+- **Boards:** 10 | **Seed:** 42 | **Slots:** 3 | **Anomaly Rate:** 0%
+- **Objective:** Correctly classify all defect types. No slot pressure.
+- **Grader:** `0.70 × accuracy + 0.30 × avg_reward`
+- **Expected frontier model score:** ≥ 0.85
+
+### Task Medium (`task_medium`)
+- **Boards:** 15 | **Seed:** 99 | **Slots:** 1 | **Anomaly Rate:** 10%
+- **Objective:** Triage boards with one soldering slot — manage queue pressure.
+- **Grader:** `0.60 × economic_efficiency + 0.40 × bottleneck_avoidance`
+- **Expected frontier model score:** ≥ 0.65
+
+### Task Hard (`task_hard`)
+- **Boards:** 20 | **Seed:** 777 | **Slots:** 1 | **Anomaly Rate:** 25%
+- **Objective:** Handle anomalous boards safely AND maintain throughput with tight slots.
+- **Grader:** `0.50 × anomaly_score + 0.30 × economic_score + 0.20 × throughput_score`
+- **Expected frontier model score:** ≥ 0.50
+
+---
+
+##  Setup & Usage
+
+### Prerequisites
+
+```bash
+Python >= 3.11
+pip install -r requirements.txt
+```
+
+### 1) Launch the Streamlit Dashboard
 
 ```bash
 streamlit run src/app.py
 ```
 
-### 2) Train the Q-learning agent
+### 2) Run the LLM Inference Script
+
+```bash
+# Set environment variables
+export API_BASE_URL="https://openrouter.ai/api/v1"
+export MODEL_NAME="meta-llama/llama-3.3-70b-instruct"
+export HF_TOKEN="hf_your_key_here"
+
+# Run baseline inference
+python inference.py
+```
+
+### 3) Run Task Grader Sanity Check
+
+```bash
+cd src
+python tasks.py
+```
+
+### 4) Train the Q-learning Agent
 
 ```bash
 python src/train.py
 ```
 
-### 3) Run CLI simulation (rule-based)
+### 5) Run CLI Simulation (rule-based)
 
 ```bash
 python src/main.py
 ```
 
-## Decision Space
+---
 
-Possible actions:
-- `PASS`
-- `SCRAP`
-- `ROUTE_COMPONENT_REPLACEMENT`
-- `ROUTE_SOLDERING`
-- `ROUTE_DIAGNOSTICS`
-- `WAIT`
+## 🐳 Docker
 
-Action validity depends on defect class (for example, `none` only allows `PASS`).
+```bash
+# Build
+docker build -t spectraqual .
 
-## Notes On Current State
+# Run the API server (default — what HF Spaces runs)
+# Exposes: GET / | POST /reset | POST /step | GET /state
+docker run -p 7860:7860 spectraqual
+# → API docs available at http://localhost:7860/docs
 
-- Reward logic is duplicated in both `src/env.py` and `src/reward.py`; this may diverge over time.
-- The UI currently computes a heuristic confidence value from board criticality rather than model uncertainty.
-- Training and UI share the same in-memory Q-table module (`agent.py`) but no persistence is implemented yet.
+# Run inference inside container
+docker run \
+  -e API_BASE_URL="https://openrouter.ai/api/v1" \
+  -e MODEL_NAME="meta-llama/llama-3.3-70b-instruct" \
+  -e HF_TOKEN="hf_..." \
+  --entrypoint python spectraqual inference.py
 
-## Suggested Next Improvements
+# Run Streamlit dashboard locally (NOT the Docker default — local dev only)
+streamlit run src/app.py --server.port 8501
+```
 
-1. Consolidate reward logic into one module.
-2. Add Q-table save/load for reusable trained policies.
-3. Populate `requirements.txt` and pin package versions.
-4. Add tests for reward correctness and valid-action constraints.
+---
+
+## 📁 Project Structure
+
+```
+spectraqual/
+├── inference.py          # Root LLM baseline script (required by OpenEnv)
+├── openenv.yaml          # OpenEnv spec metadata
+├── Dockerfile            # Container definition
+├── requirements.txt      # Pinned dependencies
+├── README.md             # This file
+└── src/
+    ├── config.py         # All constants, task configs, reward weights
+    ├── models.py         # Pydantic typed models (Observation, Action, Reward)
+    ├── env.py            # SpectraQualEnv class (reset/step/state + legacy wrappers)
+    ├── reward.py         # Multi-component normalized reward calculator
+    ├── tasks.py          # 3 tasks + programmatic graders
+    ├── agent.py          # Q-learning agent (baseline model zoo)
+    ├── app.py            # Streamlit dashboard
+    ├── train.py          # Offline Q-table trainer
+    └── main.py           # Rule-based CLI runner
+```
+
+---
+
+## 📊 Baseline Scores
+
+| Agent | task_easy | task_medium | task_hard |
+|---|---|---|---|
+| Rule-based | ~0.82 | ~0.61 | ~0.48 |
+| LLM (llama-3.3-70b) | TBD | TBD | TBD |
+| Q-learning (trained) | TBD | TBD | TBD |
+
+---
+
+## 🔬 Research Extensions
+
+The environment supports:
+- **Anomaly detection mode**: boards with extreme cost+criticality are flagged
+- **Seeded reproducibility**: every task uses a fixed RNG seed
+- **Pluggable agents**: any agent implementing `predict(observation) → action`
+- **Dense reward signal**: sub-rewards for debugging and ablation studies
+- **Explainability**: every step reward comes with a natural-language explanation
+- **Benchmark modes**: noisy observations, partial observability (planned)
+
+---
+
+## ⚙️ Environment Variables for Inference
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `API_BASE_URL` | No | `https://openrouter.ai/api/v1` | LLM API endpoint |
+| `MODEL_NAME` | No | `meta-llama/llama-3.3-70b-instruct` | Model identifier |
+| `HF_TOKEN` | Yes (prod) | — | Hugging Face / API key |
+| `LOCAL_IMAGE_NAME` | No | — | Docker image (for containerized env) |
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE).
