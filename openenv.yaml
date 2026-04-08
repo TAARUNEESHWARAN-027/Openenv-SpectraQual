@@ -89,4 +89,5 @@ interface:
 deployment:
   hf_space: "your-username/spectraqual"
   port: 7860
-  runtime: streamlit
+  runtime: fastapi
+  api_docs: "/docs"
