@@ -19,3 +19,4 @@ httpx>=0.25.0,<1.0.0
 # API Endpoints
 fastapi>=0.100.0,<1.0.0
 uvicorn>=0.23.0,<1.0.0
+openenv-core>=0.2.0

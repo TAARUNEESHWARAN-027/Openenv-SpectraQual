@@ -1,3 +1,11 @@
+---
+title: SpectraQual
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
 # SpectraQual — PCB Smart Quality-Control OpenEnv Environment
 
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compliant-00e5ff?style=flat-square)](https://github.com/openenv)

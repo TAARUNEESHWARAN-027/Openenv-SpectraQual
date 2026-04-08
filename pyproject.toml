@@ -1,0 +1,22 @@
+[project]
+name = "spectraqual"
+version = "1.0.0"
+description = "SpectraQual OpenEnv Environment"
+authors = [
+    { name = "SpectraQual Team" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0.0",
+    "fastapi",
+    "uvicorn",
+    "openai",
+    "openenv-core>=0.2.0"
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
